@@ -110,22 +110,34 @@ const EventSchema = new Schema<IEvent>(
 );
 
 // Pre-save hook for slug generation and data normalization
-EventSchema.pre('save', function (next) {
+EventSchema.pre('save', async function (next) {
     const event = this as IEvent;
 
     // Generate slug only if title changed or document is new
     if (event.isModified('title') || event.isNew) {
-        event.slug = generateSlug(event.title);
+        try {
+            event.slug = await generateUniqueSlug(event.title, event._id);
+        } catch (error) {
+            return next(error as Error);
+        }
     }
 
     // Normalize date to ISO format if it's not already
     if (event.isModified('date')) {
-        event.date = normalizeDate(event.date);
+        try {
+            event.date = normalizeDate(event.date);
+        } catch (error) {
+            return next(error as Error);
+        }
     }
 
     // Normalize time format (HH:MM)
     if (event.isModified('time')) {
-        event.time = normalizeTime(event.time);
+        try {
+            event.time = normalizeTime(event.time);
+        } catch (error) {
+            return next(error as Error);
+        }
     }
 
     next();
@@ -140,6 +152,50 @@ function generateSlug(title: string): string {
         .replace(/\s+/g, '-') // Replace spaces with hyphens
         .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
         .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+}
+
+/**
+ * Generates a unique slug by checking for collisions and appending a counter.
+ * 
+ * @param title - The title to generate the slug from
+ * @param excludeId - The ID of the current document (to exclude from collision check when updating)
+ * @returns A unique slug
+ * @throws Error if unable to generate unique slug or database error occurs
+ */
+async function generateUniqueSlug(title: string, excludeId?: any): Promise<string> {
+    const baseSlug = generateSlug(title);
+    const MAX_ATTEMPTS = 100;
+    let slug = baseSlug;
+    let counter = 1;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        try {
+            // Check if slug exists (excluding current document if updating)
+            const query = excludeId 
+                ? { slug, _id: { $ne: excludeId } }
+                : { slug };
+            
+            const existingEvent = await Event.findOne(query).select('_id').lean();
+
+            if (!existingEvent) {
+                // Slug is unique
+                return slug;
+            }
+
+            // Collision detected, append counter
+            slug = `${baseSlug}-${counter}`;
+            counter++;
+        } catch (error) {
+            // Propagate database errors
+            if (error instanceof Error) {
+                throw new Error(`Failed to generate unique slug: ${error.message}`);
+            }
+            throw new Error('Failed to generate unique slug: Unknown error');
+        }
+    }
+
+    // If we exhausted all attempts, throw error
+    throw new Error(`Unable to generate unique slug after ${MAX_ATTEMPTS} attempts`);
 }
 
 // Helper function to normalize date to ISO format

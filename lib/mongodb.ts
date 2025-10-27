@@ -17,18 +17,18 @@ interface MongooseCache {
 
 // Extend the global object to include mongoose cache
 declare global {
-  var mongoose: MongooseCache | undefined;
+  var mongooseCache: MongooseCache | undefined;
 }
 
 // Initialize the cache object
-let cached: MongooseCache = global.mongoose || {
+let cached: MongooseCache = global.mongooseCache || {
   conn: null,
   promise: null,
 };
 
 // Persist cache in global object to prevent reinitialization during hot reloads in development
-if (!global.mongoose) {
-  global.mongoose = cached;
+if (!global.mongooseCache) {
+  global.mongooseCache = cached;
 }
 
 /**
