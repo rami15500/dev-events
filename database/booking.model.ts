@@ -37,6 +37,10 @@ const BookingSchema = new Schema<IBooking>(
 );
 
 // Pre-save hook to validate events exists before creating booking
+// ⚠️ WARNING: This hook does NOT guarantee atomicity!
+// There is a race condition where an event could be deleted between this validation
+// and the actual save operation. For atomic booking creation, use a MongoDB session
+// with transactions. See the createBookingWithTransaction utility for proper implementation.
 BookingSchema.pre('save', async function (next) {
     const booking = this as IBooking;
 
