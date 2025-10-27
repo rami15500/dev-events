@@ -144,6 +144,17 @@ function generateSlug(title: string): string {
 
 // Helper function to normalize date to ISO format
 function normalizeDate(dateString: string): string {
+    // Check if already in YYYY-MM-DD format
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (isoDateRegex.test(dateString)) {
+        // Validate it's a real date
+        const date = new Date(dateString + 'T00:00:00Z');
+        if (isNaN(date.getTime())) {
+            throw new Error('Invalid date format');
+        }
+        return dateString;
+    }
+    
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
         throw new Error('Invalid date format');
